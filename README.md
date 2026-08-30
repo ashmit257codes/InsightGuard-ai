@@ -5,8 +5,9 @@ data (CSV/Excel), and the app automatically profiles the dataset, tracks KPI
 trends, detects statistical and ML-based anomalies, identifies likely drivers,
 and generates grounded business explanations using an LLM.
 
-> 🚧 **Status: In active development.** This README is updated as each phase
-> is completed — see commit history for build progress.
+> 🚧 **Status: In active development.** Core data pipeline (upload → profiling
+> → KPI trend analysis) is working end-to-end. Anomaly detection and LLM
+> insight layers are next. See commit history for build progress.
 
 ## Why this project
 
@@ -16,11 +17,31 @@ deterministic Python/statistics/ML code**, and the LLM's only job is to
 explain and contextualize numbers it's handed — never to invent them. This is
 closer to how real analytics/BI systems that use AI are actually built.
 
+## Current data pipeline
+
+```text
+Upload (CSV/Excel)
+   ↓
+Column classification (datetime / numeric / categorical / identifier)
+   ↓
+Data quality report (missing values, duplicates, constant columns, outlier flags)
+   ↓
+KPI aggregation (multi-row-per-day → clean daily/weekly/monthly time series)
+   ↓
+Trend metrics (% change, moving average, volatility, trend direction)
+```
+
+Each stage is implemented as a standalone, independently-tested module
+(`src/profiling.py`, `src/kpi_engine.py`) rather than logic embedded directly
+in the UI — this keeps the analytics layer reusable once the anomaly
+detection and LLM layers are added on top.
+
 ## Planned features
 
+
 - [x] Dataset upload (CSV/Excel) + preview
-- [ ] Automatic data profiling & data-quality report
-- [ ] KPI detection & trend analysis
+- [x] Automatic data profiling & data-quality report
+- [x] KPI trend analysis (% change, moving average, volatility, trend classification)
 - [ ] Statistical anomaly detection (Z-score, IQR) with labeled-data evaluation
 - [ ] ML anomaly detection (Isolation Forest, LOF) with precision/recall comparison
 - [ ] Anomaly severity scoring
@@ -61,9 +82,13 @@ pip install -r requirements.txt
 # Generate synthetic sample data
 python src/generate_synthetic_data.py
 
+
 # Run the app
 streamlit run src/app.py
-```
+
+# Run the test suite
+pytest tests/ -v
+
 
 ## Project structure
 
