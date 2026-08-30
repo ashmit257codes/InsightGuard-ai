@@ -13,6 +13,8 @@ file, adding new tabs/sections -- we are NOT building everything today.
 import streamlit as st
 import pandas as pd
 
+from profiling import classify_columns, generate_quality_report
+
 st.set_page_config(
     page_title="InsightGuard AI",
     page_icon="📊",
@@ -66,18 +68,52 @@ if uploaded_file is not None:
             col2.metric("Columns", df.shape[1])
             col3.metric("Missing values", int(df.isna().sum().sum()))
 
-            st.subheader("Preview")
-            st.dataframe(df.head(20), use_container_width=True)
-
-            st.subheader("Column types")
-            dtype_df = pd.DataFrame(
-                {"column": df.columns, "dtype": df.dtypes.astype(str).values}
-            )
-            st.dataframe(dtype_df, use_container_width=True, hide_index=True)
-
-            # Stash in session state so later phases (profiling, KPI engine,
-            # anomaly detection) can access the same dataframe without
-            # re-uploading.
+                        # Stash in session state so later phases (KPI engine, anomaly
+            # detection) can access the same dataframe without re-uploading.
             st.session_state["current_df"] = df
+
+            tab_preview, tab_types, tab_quality = st.tabs(
+                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality"]
+            )
+
+            with tab_preview:
+                st.dataframe(df.head(20), use_container_width=True)
+
+            with tab_types:
+                st.caption(
+                    "Automatic classification used later to detect KPIs and "
+                    "dimensions. Datetime detection also catches dates stored "
+                    "as plain text."
+                )
+                col_types = classify_columns(df)
+                type_df = pd.DataFrame(
+                    {
+                        "column": list(col_types.keys()),
+                        "detected_type": list(col_types.values()),
+                        "pandas_dtype": [str(df[c].dtype) for c in col_types.keys()],
+                    }
+                )
+                st.dataframe(type_df, use_container_width=True, hide_index=True)
+
+            with tab_quality:
+                report = generate_quality_report(df)
+                counts = report.summary_counts()
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("🔴 Critical", counts["critical"])
+                c2.metric("🟡 Warning", counts["warning"])
+                c3.metric("🔵 Info", counts["info"])
+
+                if not report.issues:
+                    st.success("No data quality issues detected.")
+                else:
+                    severity_icon = {"critical": "🔴", "warning": "🟡", "info": "🔵"}
+                    order = {"critical": 0, "warning": 1, "info": 2}
+                    sorted_issues = sorted(report.issues, key=lambda i: order[i.severity])
+
+                    for issue in sorted_issues:
+                        icon = severity_icon[issue.severity]
+                        col_label = f"**{issue.column}**" if issue.column else "**Dataset-wide**"
+                        st.markdown(f"{icon} {col_label} — {issue.detail}")
 else:
     st.info("👆 Upload a file to see a preview here.")
