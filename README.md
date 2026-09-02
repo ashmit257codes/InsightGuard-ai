@@ -42,7 +42,7 @@ detection and LLM layers are added on top.
 - [x] Dataset upload (CSV/Excel) + preview
 - [x] Automatic data profiling & data-quality report
 - [x] KPI trend analysis (% change, moving average, volatility, trend classification)
-- [ ] Statistical anomaly detection (Z-score, IQR) with labeled-data evaluation
+- [x] Statistical anomaly detection (Z-score, IQR, rolling baseline) with labeled-data evaluation
 - [ ] ML anomaly detection (Isolation Forest, LOF) with precision/recall comparison
 - [ ] Anomaly severity scoring
 - [ ] Root-cause / driver analysis
@@ -69,6 +69,25 @@ anomalies** (`src/generate_synthetic_data.py`) covering sudden drops, sudden
 spikes, and sustained multi-day dips. Each detection method is evaluated
 against these ground-truth labels using precision/recall/F1 — see
 `docs/evaluation.md` (added in Phase 5/6) for results.
+
+### Statistical method results (Day 4)
+
+Evaluated against 10 ground-truth injected anomalies across 7,300 rows:
+
+| Method | Precision | Recall | F1 |
+|---|---|---|---|
+| Z-score | 0.290 | 0.900 | **0.439** |
+| IQR | 0.122 | 0.900 | 0.214 |
+| Rolling baseline (14-day) | 0.093 | 0.400 | 0.151 |
+
+**Key finding:** Z-score outperformed IQR despite both catching 9/10 anomalies,
+because IQR's fixed quartile thresholds triggered more false positives on
+normal day-to-day noise. Rolling-baseline underperformed on sustained
+multi-day anomalies specifically — its adaptive window began treating the
+ongoing dip as "the new normal" after the first day, a known limitation of
+adaptive-baseline approaches. ML-based detection (Isolation Forest) is
+compared against these same baselines in the next phase.
+
 
 ## Getting started
 
