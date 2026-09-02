@@ -21,6 +21,7 @@ from kpi_engine import (
     compute_full_rolling_stats,
     TREND_ICONS,
 )
+from anomaly_detection import detect_anomalies, DETECTOR_REGISTRY
 st.set_page_config(
     page_title="InsightGuard AI",
     page_icon="📊",
@@ -48,20 +49,31 @@ uploaded_file = st.file_uploader(
 def load_dataset(file) -> pd.DataFrame | None:
     """
     Reads an uploaded file into a DataFrame, handling both CSV and Excel.
-    Returns None (and shows an error) if the file can't be parsed.
+    Larger Excel files can take a noticeable number of seconds to parse --
+    without a spinner, the app looks frozen during that time.
     """
     try:
-        if file.name.endswith(".csv"):
-            return pd.read_csv(file)
-        else:
-            return pd.read_excel(file)
+        with st.spinner(f"Reading {file.name}... this can take a while for large files."):
+            if file.name.endswith(".csv"):
+                return pd.read_csv(file)
+            else:
+                return pd.read_excel(file)
     except Exception as e:
         st.error(f"Could not read file: {e}")
         return None
 
 
 if uploaded_file is not None:
-    df = load_dataset(uploaded_file)
+    # Cache the parsed dataframe per uploaded file so Streamlit's constant
+    # re-running on every UI interaction doesn't re-parse a large file each
+    # time -- only re-parses when a genuinely different file is uploaded.
+    cache_key = (uploaded_file.name, uploaded_file.size)
+    if st.session_state.get("_cache_key") != cache_key:
+        df = load_dataset(uploaded_file)
+        st.session_state["_cache_key"] = cache_key
+        st.session_state["_cached_df"] = df
+    else:
+        df = st.session_state.get("_cached_df")
 
     if df is not None:
         if df.empty:
@@ -78,8 +90,8 @@ if uploaded_file is not None:
             # detection) can access the same dataframe without re-uploading.
             st.session_state["current_df"] = df
 
-            tab_preview, tab_types, tab_quality, tab_kpi = st.tabs(
-                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends"]
+            tab_preview, tab_types, tab_quality, tab_kpi, tab_anomaly = st.tabs(
+                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends", "🚨 Anomaly Detection"]
             )
 
             with tab_preview:
@@ -171,5 +183,40 @@ if uploaded_file is not None:
 
                     except ValueError as e:
                         st.error(f"Couldn't compute trend: {e}")
+
+                with tab_anomaly:
+                    col_types = classify_columns(df)
+                    datetime_cols = [c for c, t in col_types.items() if t == "datetime"]
+                    numeric_cols = [c for c, t in col_types.items() if t == "numeric"]
+                    categorical_cols = [c for c, t in col_types.items() if t == "categorical"]
+
+                    if not datetime_cols or not numeric_cols:
+                        st.warning("Need at least one datetime and one numeric column for anomaly detection.")
+                    else:
+                        a1, a2, a3 = st.columns(3)
+                        ad_date_col = a1.selectbox("Date column", datetime_cols, key="ad_date")
+                        ad_value_col = a2.selectbox("Value to check", numeric_cols, key="ad_value")
+                        ad_method = a3.selectbox("Method", list(DETECTOR_REGISTRY.keys()), key="ad_method")
+
+                        group_cols = st.multiselect(
+                            "Group by (detect separately within each group)",
+                            categorical_cols,
+                            default=categorical_cols[:2] if len(categorical_cols) >= 2 else categorical_cols,
+                            help="Anomalies localized to one segment (e.g. one region) get diluted if not grouped.",
+                        )
+
+                        if group_cols:
+                            flags = detect_anomalies(df, ad_value_col, ad_date_col, group_cols, method=ad_method)
+                            n_flagged = int(flags.sum())
+
+                            st.metric("Anomalies flagged", n_flagged)
+
+                            if n_flagged > 0:
+                                flagged_rows = df.loc[flags, [ad_date_col, ad_value_col] + group_cols]
+                                st.dataframe(flagged_rows.sort_values(ad_date_col), use_container_width=True, hide_index=True)
+                            else:
+                                st.info("No anomalies flagged with this method/grouping.")
+                        else:
+                            st.info("Select at least one column to group by.")
 else:
     st.info("👆 Upload a file to see a preview here.")

@@ -26,6 +26,14 @@ def build_kpi_timeseries(
     working[date_col] = pd.to_datetime(working[date_col], errors="coerce", format="mixed")
     working = working.dropna(subset=[date_col])
 
+    # IMPORTANT: normalize to date-only (strip time-of-day) before grouping.
+    # Real-world datasets often store full timestamps (e.g. "2010-12-01
+    # 08:26:00" for each transaction). Without this normalization, grouping
+    # by the raw column would create one group per exact timestamp instead
+    # of one per calendar day -- turning "daily revenue" into thousands of
+    # near-empty buckets instead of ~365 meaningful daily totals.
+    working[date_col] = working[date_col].dt.floor("D")
+
     grouped = working.groupby(date_col)[kpi_col]
     daily = grouped.sum() if agg == "sum" else grouped.mean()
 

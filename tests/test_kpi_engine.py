@@ -50,6 +50,26 @@ class TestBuildKpiTimeseries:
         ts = build_kpi_timeseries(df, "date", "value")
         assert list(ts.values) == [1, 2, 3]
 
+    def test_timestamps_with_time_of_day_are_grouped_by_calendar_day(self):
+        # Regression test: real-world data (e.g. transaction logs) often has
+        # full timestamps like "2025-01-01 08:26:00". Before the .dt.floor("D")
+        # fix, each distinct timestamp became its own group instead of being
+        # grouped into a single calendar day.
+        df = pd.DataFrame(
+            {
+                "date": [
+                    "2025-01-01 08:26:00",
+                    "2025-01-01 14:10:00",
+                    "2025-01-02 09:00:00",
+                ],
+                "value": [10.0, 5.0, 20.0],
+            }
+        )
+        ts = build_kpi_timeseries(df, "date", "value", freq="D", agg="sum")
+        assert len(ts) == 2
+        assert ts.iloc[0] == 15.0
+        assert ts.iloc[1] == 20.0
+
 
 class TestComputeTrendMetrics:
     def test_basic_increasing_trend(self):
