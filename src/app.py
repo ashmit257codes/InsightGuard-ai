@@ -24,6 +24,7 @@ from kpi_engine import (
 from anomaly_detection import detect_anomalies, DETECTOR_REGISTRY
 from ml_anomaly_detection import detect_ml_anomalies, ML_DETECTOR_REGISTRY
 from severity_scoring import compute_severity_scores
+from root_cause_analysis import analyze_drivers, format_driver_summary
 
 st.set_page_config(
     page_title="InsightGuard AI",
@@ -93,8 +94,8 @@ if uploaded_file is not None:
             # detection) can access the same dataframe without re-uploading.
             st.session_state["current_df"] = df
 
-            tab_preview, tab_types, tab_quality, tab_kpi, tab_anomaly = st.tabs(
-                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends", "🚨 Anomaly Detection"]
+            tab_preview, tab_types, tab_quality, tab_kpi, tab_anomaly, tab_drivers = st.tabs(
+                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends", "🚨 Anomaly Detection", "🔍 Root Cause"]
             )
 
             with tab_preview:
@@ -246,5 +247,61 @@ if uploaded_file is not None:
                             st.info("No anomalies flagged with this method/grouping.")
                     else:
                         st.info("Select at least one column to group by.")
+            with tab_drivers:
+                col_types = classify_columns(df)
+                datetime_cols = [c for c, t in col_types.items() if t == "datetime"]
+                numeric_cols = [c for c, t in col_types.items() if t == "numeric"]
+                categorical_cols = [c for c, t in col_types.items() if t == "categorical"]
+
+                if not datetime_cols or not numeric_cols or not categorical_cols:
+                    st.warning("Need a datetime column, a numeric KPI, and at least one categorical column to break down.")
+                else:
+                    d1, d2, d3 = st.columns(3)
+                    rc_date_col = d1.selectbox("Date column", datetime_cols, key="rc_date")
+                    rc_value_col = d2.selectbox("KPI to analyze", numeric_cols, key="rc_value")
+                    rc_period_days = d3.number_input("Period length (days)", min_value=1, max_value=90, value=7, key="rc_period")
+
+                    rc_group_cols = st.multiselect(
+                        "Break down by",
+                        categorical_cols,
+                        default=categorical_cols[:2] if len(categorical_cols) >= 2 else categorical_cols,
+                        key="rc_groups",
+                    )
+                    rc_agg = "sum" if rc_value_col.lower() in ("revenue", "orders", "sales", "profit", "quantity") else "mean"
+
+                    if rc_group_cols:
+                        try:
+                            result = analyze_drivers(
+                                df, date_col=rc_date_col, value_col=rc_value_col,
+                                group_cols=rc_group_cols, period_days=int(rc_period_days), agg=rc_agg,
+                            )
+
+                            icon = "📈" if result.overall_change_pct >= 0 else "📉"
+                            st.metric(
+                                f"{rc_value_col}: {result.baseline_period[0]}–{result.baseline_period[1]} → {result.current_period[0]}–{result.current_period[1]}",
+                                f"{result.overall_current:,.0f}",
+                                f"{result.overall_change_pct:+.1f}% {icon}",
+                            )
+
+                            st.caption(
+                                "Contribution shows WHERE a change concentrated across segments, "
+                                "not WHY it happened — treat these as leads to investigate, not root causes."
+                            )
+
+                            st.subheader("Top contributors")
+                            top_n = st.slider("Show top N segments", 3, 20, 5, key="rc_topn")
+                            display_df = result.drivers.head(top_n).copy()
+                            display_df["contribution_pct"] = display_df["contribution_pct"].round(1)
+                            display_df["pct_change"] = display_df["pct_change"].round(1)
+                            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+                            st.subheader("Summary")
+                            for line in format_driver_summary(result, top_n=3):
+                                st.markdown(f"- {line}")
+
+                        except ValueError as e:
+                            st.error(str(e))
+                    else:
+                        st.info("Select at least one column to break down by.")       
 else:
     st.info("👆 Upload a file to see a preview here.")
