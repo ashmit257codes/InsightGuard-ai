@@ -46,7 +46,7 @@ detection and LLM layers are added on top.
 - [x] ML anomaly detection (Isolation Forest, LOF) with precision/recall comparison
 - [x] Anomaly severity scoring
 - [x] Root-cause / driver analysis (segment-level contribution breakdown)
-- [ ] LLM-grounded business insight generation
+- [x] LLM-grounded business insight generation (Groq API, structured-data-only, non-causal language)
 - [ ] Chat-with-your-data agent (tool-calling)
 - [ ] Anomaly history + feedback loop
 - [ ] (Stretch) Email alerts for critical anomalies
@@ -56,7 +56,7 @@ detection and LLM layers are added on top.
 - **App**: Streamlit (Python-only, single deployable app)
 - **Data**: Pandas, NumPy
 - **ML**: scikit-learn (Isolation Forest, Local Outlier Factor)
-- **LLM**: Groq API (Llama models, free tier)
+- **LLM**: Groq API (`openai/gpt-oss-20b`, free tier) — receives only pre-computed structured JSON, never raw data
 - **Storage**: SQLite (anomaly history/feedback)
 - **Deployment**: Streamlit Community Cloud (free)
 
