@@ -22,6 +22,9 @@ from kpi_engine import (
     TREND_ICONS,
 )
 from anomaly_detection import detect_anomalies, DETECTOR_REGISTRY
+from ml_anomaly_detection import detect_ml_anomalies, ML_DETECTOR_REGISTRY
+from severity_scoring import compute_severity_scores
+
 st.set_page_config(
     page_title="InsightGuard AI",
     page_icon="📊",
@@ -184,39 +187,64 @@ if uploaded_file is not None:
                     except ValueError as e:
                         st.error(f"Couldn't compute trend: {e}")
 
-                with tab_anomaly:
-                    col_types = classify_columns(df)
-                    datetime_cols = [c for c, t in col_types.items() if t == "datetime"]
-                    numeric_cols = [c for c, t in col_types.items() if t == "numeric"]
-                    categorical_cols = [c for c, t in col_types.items() if t == "categorical"]
+            with tab_anomaly:
+                col_types = classify_columns(df)
+                datetime_cols = [c for c, t in col_types.items() if t == "datetime"]
+                numeric_cols = [c for c, t in col_types.items() if t == "numeric"]
+                categorical_cols = [c for c, t in col_types.items() if t == "categorical"]
 
-                    if not datetime_cols or not numeric_cols:
-                        st.warning("Need at least one datetime and one numeric column for anomaly detection.")
-                    else:
-                        a1, a2, a3 = st.columns(3)
-                        ad_date_col = a1.selectbox("Date column", datetime_cols, key="ad_date")
-                        ad_value_col = a2.selectbox("Value to check", numeric_cols, key="ad_value")
-                        ad_method = a3.selectbox("Method", list(DETECTOR_REGISTRY.keys()), key="ad_method")
+                if not datetime_cols or not numeric_cols:
+                    st.warning("Need at least one datetime and one numeric column for anomaly detection.")
+                else:
+                    a1, a2, a3 = st.columns(3)
+                    ad_date_col = a1.selectbox("Date column", datetime_cols, key="ad_date")
+                    ad_value_col = a2.selectbox("Value to check", numeric_cols, key="ad_value")
 
-                        group_cols = st.multiselect(
-                            "Group by (detect separately within each group)",
-                            categorical_cols,
-                            default=categorical_cols[:2] if len(categorical_cols) >= 2 else categorical_cols,
-                            help="Anomalies localized to one segment (e.g. one region) get diluted if not grouped.",
+                    all_methods = {**{k: "statistical" for k in DETECTOR_REGISTRY}, **{k: "ml" for k in ML_DETECTOR_REGISTRY}}
+                    ad_method = a3.selectbox("Method", list(all_methods.keys()), key="ad_method")
+                    is_ml_method = all_methods[ad_method] == "ml"
+
+                    group_cols = st.multiselect(
+                        "Group by (detect separately within each group)",
+                        categorical_cols,
+                        default=categorical_cols[:2] if len(categorical_cols) >= 2 else categorical_cols,
+                        help="Anomalies localized to one segment (e.g. one region) get diluted if not grouped.",
+                    )
+
+                    method_kwargs = {}
+                    if is_ml_method:
+                        st.caption(
+                            "ML methods require an assumed anomaly rate (contamination). "
+                            "Too high → many false alarms. Too low → real anomalies missed."
                         )
+                        contamination = st.slider(
+                            "Assumed anomaly rate (contamination)",
+                            min_value=0.005, max_value=0.10, value=0.01, step=0.005,
+                            format="%.3f",
+                        )
+                        method_kwargs["contamination"] = contamination
 
-                        if group_cols:
-                            flags = detect_anomalies(df, ad_value_col, ad_date_col, group_cols, method=ad_method)
-                            n_flagged = int(flags.sum())
-
-                            st.metric("Anomalies flagged", n_flagged)
-
-                            if n_flagged > 0:
-                                flagged_rows = df.loc[flags, [ad_date_col, ad_value_col] + group_cols]
-                                st.dataframe(flagged_rows.sort_values(ad_date_col), use_container_width=True, hide_index=True)
-                            else:
-                                st.info("No anomalies flagged with this method/grouping.")
+                    if group_cols:
+                        if is_ml_method:
+                            flags = detect_ml_anomalies(df, ad_value_col, ad_date_col, group_cols, method=ad_method, **method_kwargs)
                         else:
-                            st.info("Select at least one column to group by.")
+                            flags = detect_anomalies(df, ad_value_col, ad_date_col, group_cols, method=ad_method)
+
+                        n_flagged = int(flags.sum())
+                        st.metric("Anomalies flagged", n_flagged)
+
+                        if n_flagged > 0:
+                            severity = compute_severity_scores(df, ad_value_col, ad_date_col, group_cols, flags)
+                            flagged_rows = df.loc[flags, [ad_date_col, ad_value_col] + group_cols].join(severity)
+                            flagged_rows = flagged_rows.sort_values("severity_score", ascending=False)
+
+                            severity_color = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🔵"}
+                            flagged_rows.insert(0, "severity", flagged_rows["severity_label"].map(severity_color) + " " + flagged_rows["severity_label"])
+                            display_cols = [ad_date_col] + group_cols + [ad_value_col, "deviation_pct", "persistence_days", "severity"]
+                            st.dataframe(flagged_rows[display_cols], use_container_width=True, hide_index=True)
+                        else:
+                            st.info("No anomalies flagged with this method/grouping.")
+                    else:
+                        st.info("Select at least one column to group by.")
 else:
     st.info("👆 Upload a file to see a preview here.")
