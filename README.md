@@ -44,8 +44,8 @@ detection and LLM layers are added on top.
 - [x] KPI trend analysis (% change, moving average, volatility, trend classification)
 - [x] Statistical anomaly detection (Z-score, IQR, rolling baseline) with labeled-data evaluation
 - [x] ML anomaly detection (Isolation Forest, LOF) with precision/recall comparison
-- [ ] Anomaly severity scoring
-- [ ] Root-cause / driver analysis
+- [x] Anomaly severity scoring
+- [x] Root-cause / driver analysis (segment-level contribution breakdown)
 - [ ] LLM-grounded business insight generation
 - [ ] Chat-with-your-data agent (tool-calling)
 - [ ] Anomaly history + feedback loop
