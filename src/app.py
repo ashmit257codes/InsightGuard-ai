@@ -28,6 +28,7 @@ from root_cause_analysis import analyze_drivers, format_driver_summary
 from llm_insights import build_structured_summary, generate_business_insight
 from chat_agent import build_tool_schemas, build_tool_dispatch, run_agent_turn
 from email_alerts import build_alert_email, send_alert_email
+from feedback_store import submit_feedback, get_feedback_lookup, get_feedback_summary
 
 st.set_page_config(
     page_title="InsightGuard AI",
@@ -244,8 +245,48 @@ if uploaded_file is not None:
 
                             severity_color = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🔵"}
                             flagged_rows.insert(0, "severity", flagged_rows["severity_label"].map(severity_color) + " " + flagged_rows["severity_label"])
-                            display_cols = [ad_date_col] + group_cols + [ad_value_col, "deviation_pct", "persistence_days", "severity"]
-                            st.dataframe(flagged_rows[display_cols], use_container_width=True, hide_index=True)
+
+                            feedback_lookup = get_feedback_lookup(kpi_name=ad_value_col)
+
+                            st.caption("Review each flagged anomaly — your feedback is saved and persists across sessions.")
+                            header_cols = st.columns([2, 2, 1.5, 1.5, 1, 1.5, 1.5])
+                            for col, label in zip(header_cols, [ad_date_col, "Segment", ad_value_col, "Deviation", "Persist.", "Severity", "Feedback"]):
+                                col.markdown(f"**{label}**")
+
+                            for idx, row in flagged_rows.iterrows():
+                                segment_label = " + ".join(str(row[c]) for c in group_cols)
+                                date_str = str(row[ad_date_col])
+                                key_tuple = (date_str, segment_label, ad_value_col)
+                                existing = feedback_lookup.get(key_tuple)
+
+                                cols = st.columns([2, 2, 1.5, 1.5, 1, 1.5, 1.5])
+                                cols[0].write(date_str)
+                                cols[1].write(segment_label)
+                                cols[2].write(f"{row[ad_value_col]:,.1f}")
+                                cols[3].write(f"{row['deviation_pct']:+.1f}%")
+                                cols[4].write(int(row["persistence_days"]))
+                                cols[5].write(row["severity"])
+
+                                with cols[6]:
+                                    if existing == "valid":
+                                        st.markdown("✅ Valid")
+                                    elif existing == "false_positive":
+                                        st.markdown("❌ False +")
+                                    else:
+                                        btn_col1, btn_col2 = st.columns(2)
+                                        if btn_col1.button("✓", key=f"valid_{idx}", help="Mark as valid anomaly"):
+                                            submit_feedback(date_str, segment_label, ad_value_col, "valid")
+                                            st.rerun()
+                                        if btn_col2.button("✗", key=f"fp_{idx}", help="Mark as false positive"):
+                                            submit_feedback(date_str, segment_label, ad_value_col, "false_positive")
+                                            st.rerun()
+
+                            fb_summary = get_feedback_summary()
+                            if fb_summary["valid"] + fb_summary["false_positive"] > 0:
+                                st.divider()
+                                s1, s2 = st.columns(2)
+                                s1.metric("✅ Confirmed valid (all-time)", fb_summary["valid"])
+                                s2.metric("❌ Marked false positive (all-time)", fb_summary["false_positive"])
 
                             critical_rows = flagged_rows[flagged_rows["severity_label"] == "CRITICAL"]
                             if len(critical_rows) > 0:
