@@ -26,6 +26,7 @@ from ml_anomaly_detection import detect_ml_anomalies, ML_DETECTOR_REGISTRY
 from severity_scoring import compute_severity_scores
 from root_cause_analysis import analyze_drivers, format_driver_summary
 from llm_insights import build_structured_summary, generate_business_insight
+from chat_agent import build_tool_schemas, build_tool_dispatch, run_agent_turn
 
 st.set_page_config(
     page_title="InsightGuard AI",
@@ -95,8 +96,8 @@ if uploaded_file is not None:
             # detection) can access the same dataframe without re-uploading.
             st.session_state["current_df"] = df
 
-            tab_preview, tab_types, tab_quality, tab_kpi, tab_anomaly, tab_drivers = st.tabs(
-                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends", "🚨 Anomaly Detection", "🔍 Root Cause"]
+            tab_preview, tab_types, tab_quality, tab_kpi, tab_anomaly, tab_drivers, tab_chat = st.tabs(
+                ["📋 Preview", "🏷️ Column Types", "🩺 Data Quality", "📈 KPI Trends", "🚨 Anomaly Detection", "🔍 Root Cause", "💬 Chat"]
             )
 
             with tab_preview:
@@ -320,6 +321,60 @@ if uploaded_file is not None:
                         except ValueError as e:
                             st.error(str(e))
                     else:
-                        st.info("Select at least one column to break down by.")       
+                        st.info("Select at least one column to break down by.") 
+            with tab_chat:
+                col_types = classify_columns(df)
+                datetime_cols = [c for c, t in col_types.items() if t == "datetime"]
+                numeric_cols = [c for c, t in col_types.items() if t == "numeric"]
+                categorical_cols = [c for c, t in col_types.items() if t == "categorical"]
+
+                if not datetime_cols or not numeric_cols or not categorical_cols:
+                    st.warning("Chat needs a datetime column, a numeric KPI, and at least one categorical column.")
+                else:
+                    st.caption(
+                        "Ask questions about your data — the AI picks the right analysis tool "
+                        "(trend, drivers, or anomalies) and answers using only computed results."
+                    )
+
+                    chat_date_col = datetime_cols[0]
+                    chat_group_cols = categorical_cols[:2]
+
+                    if "chat_messages" not in st.session_state:
+                        st.session_state.chat_messages = []
+
+                    for msg in st.session_state.chat_messages:
+                        with st.chat_message(msg["role"]):
+                            st.markdown(msg["content"])
+
+                    user_question = st.chat_input("Ask about your data...")
+                    if user_question:
+                        st.session_state.chat_messages.append({"role": "user", "content": user_question})
+                        with st.chat_message("user"):
+                            st.markdown(user_question)
+
+                        tool_schemas = build_tool_schemas(numeric_cols, categorical_cols)
+                        tool_dispatch = build_tool_dispatch(df, date_col=chat_date_col, group_cols=chat_group_cols)
+
+                        with st.chat_message("assistant"):
+                            with st.spinner("Thinking..."):
+                                try:
+                                    # Reconstruct simple history (user/assistant text only)
+                                    # for context -- tool-call internals aren't replayed.
+                                    simple_history = [
+                                        {"role": m["role"], "content": m["content"]}
+                                        for m in st.session_state.chat_messages[:-1]
+                                    ]
+                                    answer, _ = run_agent_turn(
+                                        user_question, tool_schemas, tool_dispatch, chat_history=simple_history
+                                    )
+                                    st.markdown(answer)
+                                    st.session_state.chat_messages.append({"role": "assistant", "content": answer})
+                                except RuntimeError as e:
+                                    st.error(str(e))
+
+                    if st.session_state.chat_messages:
+                        if st.button("Clear chat"):
+                            st.session_state.chat_messages = []
+                            st.rerun()      
 else:
     st.info("👆 Upload a file to see a preview here.")
