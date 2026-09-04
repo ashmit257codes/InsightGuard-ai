@@ -49,7 +49,7 @@ detection and LLM layers are added on top.
 - [x] LLM-grounded business insight generation (Groq API, structured-data-only, non-causal language)
 - [x] Chat-with-your-data agent (tool-calling: KPI trend, drivers, anomalies, data quality)
 - [ ] Anomaly history + feedback loop
-- [ ] (Stretch) Email alerts for critical anomalies
+- [x] Email alerts for critical anomalies (Gmail SMTP, free)
 
 ## Tech stack
 
@@ -120,6 +120,16 @@ honest failure modes: when asked a question the available tools can't
 answer (e.g. per-segment anomaly counts, which aren't currently computed),
 the agent explicitly says so rather than fabricating a plausible-sounding
 answer.
+
+### Email alerts (Day 9)
+
+CRITICAL-severity anomalies (from the Day 5 severity scoring system) can
+trigger an email alert via Gmail SMTP — no paid service or third-party API
+required, just a free Gmail App Password. Deliberately scoped down from a
+full alert-fatigue-prevention system (deduplication, cooldowns, escalation)
+since that's meaningful additional engineering with limited portfolio value
+for a single-user demo app; only CRITICAL items (not LOW/MEDIUM/HIGH) send
+an email, which is the core idea of not spamming on every minor blip.
 
 ## Getting started
 

@@ -27,6 +27,7 @@ from severity_scoring import compute_severity_scores
 from root_cause_analysis import analyze_drivers, format_driver_summary
 from llm_insights import build_structured_summary, generate_business_insight
 from chat_agent import build_tool_schemas, build_tool_dispatch, run_agent_turn
+from email_alerts import build_alert_email, send_alert_email
 
 st.set_page_config(
     page_title="InsightGuard AI",
@@ -245,6 +246,27 @@ if uploaded_file is not None:
                             flagged_rows.insert(0, "severity", flagged_rows["severity_label"].map(severity_color) + " " + flagged_rows["severity_label"])
                             display_cols = [ad_date_col] + group_cols + [ad_value_col, "deviation_pct", "persistence_days", "severity"]
                             st.dataframe(flagged_rows[display_cols], use_container_width=True, hide_index=True)
+
+                            critical_rows = flagged_rows[flagged_rows["severity_label"] == "CRITICAL"]
+                            if len(critical_rows) > 0:
+                                st.divider()
+                                st.subheader("📧 Email Alert")
+                                st.caption(f"{len(critical_rows)} CRITICAL-severity anomal{'y' if len(critical_rows)==1 else 'ies'} found. Only CRITICAL items trigger an alert — avoids alert fatigue on lower-priority anomalies.")
+
+                                alert_email = st.text_input("Send alert to:", key="alert_email")
+                                if st.button("Send Email Alert", key="send_alert"):
+                                    if not alert_email:
+                                        st.warning("Enter a recipient email address first.")
+                                    else:
+                                        message = build_alert_email(
+                                            critical_rows.reset_index(drop=True), kpi_name=ad_value_col,
+                                            date_col=ad_date_col, group_cols=group_cols, recipient_email=alert_email,
+                                        )
+                                        success, error = send_alert_email(message)
+                                        if success:
+                                            st.success(f"Alert sent to {alert_email}")
+                                        else:
+                                            st.error(error)
                         else:
                             st.info("No anomalies flagged with this method/grouping.")
                     else:
