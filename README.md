@@ -47,7 +47,7 @@ detection and LLM layers are added on top.
 - [x] Anomaly severity scoring
 - [x] Root-cause / driver analysis (segment-level contribution breakdown)
 - [x] LLM-grounded business insight generation (Groq API, structured-data-only, non-causal language)
-- [ ] Chat-with-your-data agent (tool-calling)
+- [x] Chat-with-your-data agent (tool-calling: KPI trend, drivers, anomalies, data quality)
 - [ ] Anomaly history + feedback loop
 - [ ] (Stretch) Email alerts for critical anomalies
 
@@ -108,6 +108,18 @@ region+category segment:
 should be driven by the actual structure of the data (univariate vs.
 multivariate, stable vs. trending) rather than assuming more sophisticated
 = better.
+
+### Chat agent (Day 8)
+
+A single agent with four deterministic tools (`get_kpi_trend`, `get_top_drivers`,
+`get_anomaly_summary`, `get_data_quality_summary`) — the LLM chooses which
+tool(s) to call based on the question, executes them, and answers using
+only the returned results. Tested for multi-turn context (follow-up
+questions correctly resolve pronouns like "those" to prior results) and for
+honest failure modes: when asked a question the available tools can't
+answer (e.g. per-segment anomaly counts, which aren't currently computed),
+the agent explicitly says so rather than fabricating a plausible-sounding
+answer.
 
 ## Getting started
 
