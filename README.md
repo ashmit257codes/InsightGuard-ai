@@ -48,7 +48,7 @@ detection and LLM layers are added on top.
 - [x] Root-cause / driver analysis (segment-level contribution breakdown)
 - [x] LLM-grounded business insight generation (Groq API, structured-data-only, non-causal language)
 - [x] Chat-with-your-data agent (tool-calling: KPI trend, drivers, anomalies, data quality)
-- [ ] Anomaly history + feedback loop
+- [x] Anomaly history + feedback loop (SQLite, persists across sessions)
 - [x] Email alerts for critical anomalies (Gmail SMTP, free)
 
 ## Tech stack
@@ -131,10 +131,22 @@ since that's meaningful additional engineering with limited portfolio value
 for a single-user demo app; only CRITICAL items (not LOW/MEDIUM/HIGH) send
 an email, which is the core idea of not spamming on every minor blip.
 
+
+### Feedback loop (Day 9)
+
+Users can mark any flagged anomaly as ✓ Valid or ✗ False Positive directly
+in the UI. Feedback is stored in a local SQLite database (`data/feedback.db`,
+gitignored — it's per-user runtime data, not source code) keyed by
+(date, segment, KPI) rather than dataframe row position, so it correctly
+persists across app restarts and dataset re-uploads. This is the
+human-in-the-loop mechanism that would feed into future threshold tuning
+or model retraining, though that retraining step itself is out of scope
+for this build.
+
 ## Getting started
 
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/ashmit257codes/InsightGuard-ai.git>
 cd insightguard-ai
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
