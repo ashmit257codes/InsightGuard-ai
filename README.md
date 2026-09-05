@@ -1,5 +1,5 @@
 # InsightGuard AI
-![InsightGuard AI landing page showing the logo, tagline, and a grid of seven feature cards describing the app's capabilities](image.png)
+![InsightGuard AI landing page showing the logo, tagline, and a grid of seven feature cards describing the app's capabilities](docs/screenshots/landing.png)
 
 🔗 **[Live Demo](https://insightguard-ai.streamlit.app/)**
 
@@ -78,10 +78,24 @@ spikes, and sustained multi-day dips. Each detection method is evaluated
 against these ground-truth labels using precision/recall/F1 — see
 `docs/evaluation.md` (added in Phase 5/6) for results.
 
+
+
 ### Statistical method results (Day 4)
 
+### KPI Trend Analysis
+![KPI Trends tab showing revenue over time with a 7-day moving average, percentage change, and trend direction indicator](docs/screenshots/kpi-trends.png)
+
+Aggregates any numeric column into a clean daily, weekly, or monthly time
+series and computes the metrics a real monitoring dashboard needs: current
+value vs. the previous period, percentage change, a moving average to
+smooth day-to-day noise, and volatility measured via coefficient of
+variation (so KPIs of very different scales — e.g. a ₹500 product vs. a
+₹50,000 product — can be compared fairly). A configurable threshold
+(default ±5%) classifies each KPI as increasing, decreasing, or stable,
+preventing normal statistical noise from being reported as a false trend.
+
 ### Anomaly detection method comparison (Days 4-5)
-![Anomaly Detection tab showing flagged anomalies with severity badges, deviation percentage, and valid/false-positive feedback buttons](image-1.png)
+![Anomaly Detection tab showing flagged anomalies with severity badges, deviation percentage, and valid/false-positive feedback buttons](docs/screenshots/anomaly-detection.png)
 
 Evaluated against 10 ground-truth injected anomalies across 7,300 rows
 (4 regions × 5 categories × 365 days), detecting independently per
@@ -119,6 +133,7 @@ multivariate, stable vs. trending) rather than assuming more sophisticated
 = better.
 
 ### Chat agent (Day 8)
+![AI chat agent answering a multi-turn question about revenue anomalies, showing tool-calling results grounded in computed data](docs/screenshots/chat-agent.png)
 
 A single agent with four deterministic tools (`get_kpi_trend`, `get_top_drivers`,
 `get_anomaly_summary`, `get_data_quality_summary`) — the LLM chooses which
