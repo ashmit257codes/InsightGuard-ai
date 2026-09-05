@@ -36,16 +36,41 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📊 InsightGuard AI")
-st.caption("AI-powered business intelligence & anomaly detection")
+st.markdown("""
+<style>
+    .hero-section { text-align: center; padding: 30px 20px 10px 20px; }
+    .hero-logo svg { width: 60px; height: 60px; }
+    .hero-title { font-size: 2.2rem; font-weight: 800; color: #1E293B; margin: 10px 0 4px 0; }
+    .hero-tagline { font-size: 1.05rem; color: #2563EB; font-weight: 600; margin-bottom: 12px; }
+    .hero-description { max-width: 650px; margin: 0 auto; color: #475569; font-size: 0.95rem; line-height: 1.6; }
+    .feature-grid { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding: 25px 10px 10px 10px; }
+    .feature-card {
+        background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px;
+        padding: 18px; width: 250px; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .feature-title { font-weight: 700; color: #1E293B; margin-bottom: 6px; font-size: 1rem; }
+    .feature-desc { color: #64748B; font-size: 0.85rem; line-height: 1.5; }
+</style>
+""", unsafe_allow_html=True)
 
-st.markdown(
-    """
-    Upload a business dataset (CSV or Excel) to get started.
-    You can also try the included **synthetic sample data**
-    (`data/labeled_sales_data.csv`) to explore the app.
-    """
-)
+LOGO_SVG = """<svg viewBox='0 0 48 48' fill='none' xmlns='http://www.w3.org/2000/svg'>
+<path d='M24 4L40 10V22C40 32.5 33.5 41 24 44C14.5 41 8 32.5 8 22V10L24 4Z' fill='#2563EB' fill-opacity='0.1' stroke='#2563EB' stroke-width='2.5' stroke-linejoin='round'/>
+<path d='M15 26L20 20L25 25L33 15' stroke='#2563EB' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/>
+<circle cx='33' cy='15' r='2.2' fill='#2563EB'/>
+</svg>"""
+
+FEATURES = [
+    {"key": "profiling", "title": "Automatic Data Profiling", "desc": "Detects column types, missing values, and data quality issues instantly."},
+    {"key": "kpi", "title": "KPI Trend Analysis", "desc": "Tracks revenue, orders, or any metric over time with moving averages and trend direction."},
+    {"key": "stat_anomaly", "title": "Statistical Anomaly Detection", "desc": "Z-score, IQR, and rolling-baseline methods flag unusual points."},
+    {"key": "ml_anomaly", "title": "ML-Powered Detection", "desc": "Isolation Forest and Local Outlier Factor catch complex anomalies."},
+    {"key": "drivers", "title": "Root Cause Analysis", "desc": "Breaks down KPI changes by segment to find the biggest contributors."},
+    {"key": "chat", "title": "AI Insights & Chat", "desc": "A grounded LLM explains your metrics and answers follow-up questions."},
+    {"key": "alerts", "title": "Alerts & Feedback", "desc": "Get emailed on critical anomalies; mark detections valid or false positive."},
+]
+
+if "landing_detail" not in st.session_state:
+    st.session_state["landing_detail"] = None
 
 uploaded_file = st.file_uploader(
     "Upload your dataset",
@@ -70,7 +95,41 @@ def load_dataset(file) -> pd.DataFrame | None:
         st.error(f"Could not read file: {e}")
         return None
 
+def render_landing_page():
+    st.markdown(f"""
+    <div class='hero-section'>
+        <div class='hero-logo'>{LOGO_SVG}</div>
+        <h1 class='hero-title'>InsightGuard AI</h1>
+        <p class='hero-tagline'>AI-Powered Business Intelligence &amp; Anomaly Detection</p>
+        <p class='hero-description'>
+            Upload a business dataset (CSV or Excel) and instantly get automatic
+            data profiling, KPI trend tracking, statistical and ML-based anomaly
+            detection, root-cause analysis, and AI-generated business insights —
+            all backed by deterministic, tested analytics code.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
+    cols = st.columns(4)
+    for i, feature in enumerate(FEATURES):
+        with cols[i % 4]:
+            st.markdown(f"""
+            <div class='feature-card'>
+                <div class='feature-title'>{feature['title']}</div>
+                <div class='feature-desc'>{feature['desc']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Learn more", key=f"learn_{feature['key']}"):
+                st.session_state["landing_detail"] = (
+                    feature['key'] if st.session_state["landing_detail"] != feature['key'] else None
+                )
+
+    if st.session_state["landing_detail"]:
+        detail = next(f for f in FEATURES if f["key"] == st.session_state["landing_detail"])
+        st.divider()
+        st.subheader(detail["title"])
+        st.write(detail["desc"])
+        st.caption("Upload a dataset above to try this feature live.")
 if uploaded_file is not None:
     # Cache the parsed dataframe per uploaded file so Streamlit's constant
     # re-running on every UI interaction doesn't re-parse a large file each
@@ -440,4 +499,4 @@ if uploaded_file is not None:
                             st.session_state.chat_messages = []
                             st.rerun()      
 else:
-    st.info("👆 Upload a file to see a preview here.")
+    render_landing_page()

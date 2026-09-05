@@ -5,3 +5,4 @@ plotly
 scikit-learn
 groq
 python-dotenv
+python-calamine
