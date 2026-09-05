@@ -1,13 +1,21 @@
 # InsightGuard AI
+![InsightGuard AI landing page showing the logo, tagline, and a grid of seven feature cards describing the app's capabilities](image.png)
+
+🔗 **[Live Demo](https://insightguard-ai.streamlit.app/)**
 
 AI-powered business intelligence & anomaly detection platform. Upload business
 data (CSV/Excel), and the app automatically profiles the dataset, tracks KPI
 trends, detects statistical and ML-based anomalies, identifies likely drivers,
 and generates grounded business explanations using an LLM.
 
-> 🚧 **Status: In active development.** Core data pipeline (upload → profiling
-> → KPI trend analysis) is working end-to-end. Anomaly detection and LLM
-> insight layers are next. See commit history for build progress.
+> ✅ **Status: Complete and deployed.** Full pipeline — profiling, KPI
+> trends, statistical + ML anomaly detection, severity scoring, root cause
+> analysis, LLM-grounded insights, a tool-calling chat agent, email alerts,
+> and a feedback loop — is live and working end-to-end.
+>
+> **Note on the live demo:** Streamlit Community Cloud's free tier uses
+> ephemeral storage, so the feedback loop (SQLite) resets on redeploy.
+> Locally, feedback persists indefinitely across restarts.
 
 ## Why this project
 
@@ -73,6 +81,7 @@ against these ground-truth labels using precision/recall/F1 — see
 ### Statistical method results (Day 4)
 
 ### Anomaly detection method comparison (Days 4-5)
+![Anomaly Detection tab showing flagged anomalies with severity badges, deviation percentage, and valid/false-positive feedback buttons](image-1.png)
 
 Evaluated against 10 ground-truth injected anomalies across 7,300 rows
 (4 regions × 5 categories × 365 days), detecting independently per
